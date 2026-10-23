@@ -1,0 +1,64 @@
+{
+    "name": "team-blue/php-client-mock",
+    "type": "library",
+    "description": "Mock REST and SOAP clients",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Arne De Smedt",
+            "email": "arnedesmdt@gmail.com",
+            "homepage": "https://github.com/arnedesmedt"
+        }
+    ],
+    "require": {
+        "php": "^8.2",
+        "event-engine/php-json-schema": "~3.0",
+        "guzzlehttp/guzzle": "^7.9",
+        "mockery/mockery": "~1.0",
+        "phpunit/phpunit": "~9.0 || ~10.0 || ~11.0 || ~12.0 || ~13.0",
+        "team-blue/php-util": "^1.0",
+        "team-blue/php-value-objects": "^2.0 || ^3.0.0"
+    },
+    "require-dev": {
+        "doctrine/coding-standard": "~11.0",
+        "icanhazstring/composer-unused": "~0.1",
+        "phpmd/phpmd": "~2.0",
+        "phpro/grumphp": "~2.0",
+        "phpstan/phpstan": "~1.0",
+        "rector/rector": "~0.1",
+        "squizlabs/php_codesniffer": "~3.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "TeamBlue\\ClientMock\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "TeamBlue\\ClientMock\\Tests\\": "tests/"
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "config": {
+        "allow-plugins": {
+            "dealerdirect/phpcodesniffer-composer-installer": true,
+            "phpro/grumphp": true
+        },
+        "sort-packages": true
+    },
+    "scripts-descriptions": {
+        "tests": "Run all tests"
+    },
+    "scripts": {
+        "tests": [
+            "vendor/bin/composer-unused",
+            "vendor/bin/phpcs",
+            "vendor/bin/phpstan analyze --no-progress",
+            "vendor/bin/phpmd src text phpmd.xml",
+            "vendor/bin/phpmd tests text phpmd-tests.xml",
+            "vendor/bin/rector --dry-run --no-progress-bar",
+            "vendor/bin/phpunit"
+        ]
+    }
+}
