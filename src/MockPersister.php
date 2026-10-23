@@ -1,0 +1,172 @@
+<?php
+
+declare(strict_types=1);
+
+namespace TeamBlue\ClientMock;
+
+use Closure;
+use RuntimeException;
+use Throwable;
+
+use function array_combine;
+use function array_filter;
+use function array_keys;
+use function array_values;
+use function end;
+use function in_array;
+use function sprintf;
+
+class MockPersister
+{
+    private MockMethod|null $lastCall = null;
+    /** @var array<int, MockMethod> */
+    private array $calls = [];
+
+    public function __construct(private readonly ReturnValueTransformer|null $returnValueTransformer = null)
+    {
+    }
+
+    public function __invoke(string $method, mixed ...$parameters): self
+    {
+        if ($this->lastCall !== null) {
+            throw new RuntimeException('You must call withReturnValue() after calling a method.');
+        }
+
+        $this->lastCall = (new MockMethod($method))->addParameters($parameters);
+
+        return $this;
+    }
+
+    public function withReturnValue(mixed $returnValue): void
+    {
+        if (! $this->lastCall instanceof MockMethod) {
+            throw new RuntimeException('You must call a method before calling withReturnValue().');
+        }
+
+        $returnValue = $this->transformReturnValue($returnValue);
+
+        $this->calls[] = $this->lastCall->addReturnValue($returnValue);
+
+        $this->lastCall = null;
+    }
+
+    public function withException(Throwable|Closure $exception): void
+    {
+        if (! $this->lastCall instanceof MockMethod) {
+            throw new RuntimeException('You must call a method before calling withException().');
+        }
+
+        $this->calls[] = $this->lastCall->addException($exception);
+
+        $this->lastCall = null;
+    }
+
+    /** @return array<string, MockMethod> */
+    public function calls(): array
+    {
+        $callsPerMethod = [];
+        foreach ($this->calls as $call) {
+            if (isset($callsPerMethod[$call->method()])) {
+                $call = $callsPerMethod[$call->method()]->merge($call);
+            }
+
+            $callsPerMethod[$call->method()] = clone $call;
+        }
+
+        return $callsPerMethod;
+    }
+
+    private function transformReturnValue(
+        mixed $returnValue,
+    ): mixed {
+        if ($this->returnValueTransformer === null) {
+            return $returnValue;
+        }
+
+        return ($this->returnValueTransformer)($returnValue, $this->lastCall);
+    }
+
+    public function removeMockMethods(string ...$methods): void
+    {
+        foreach ($methods as $method) {
+            foreach ($this->calls as $index => $call) {
+                if ($call->method() !== $method) {
+                    continue;
+                }
+
+                unset($this->calls[$index]);
+            }
+        }
+    }
+
+    public function removeMockMethodsExcept(string ...$methods): void
+    {
+        foreach ($this->calls as $index => $call) {
+            if (in_array($call->method(), $methods, true)) {
+                continue;
+            }
+
+            unset($this->calls[$index]);
+        }
+    }
+
+    public function hasMockMethod(string $method): bool
+    {
+        return ! empty($this->mockMethods($method));
+    }
+
+    /** @return array<MockMethod> */
+    public function mockMethods(string $method): array
+    {
+        return array_filter(
+            $this->calls,
+            static fn (MockMethod $call) => $call->method() === $method,
+        );
+    }
+
+    /** @return array<MockMethod> */
+    public function needMockMethods(string $method): array
+    {
+        $methodCalls = $this->mockMethods($method);
+
+        if (empty($methodCalls)) {
+            throw new RuntimeException(
+                sprintf(
+                    'Mock method %s does not exist.',
+                    $method,
+                ),
+            );
+        }
+
+        return $methodCalls;
+    }
+
+    public function removeMockMethodForIndex(string $method, int $index): void
+    {
+        $mockMethods = $this->needMockMethods($method);
+        $originalKeys = array_keys($mockMethods);
+        $newKeys = array_keys(array_values($mockMethods));
+        $mapping = array_combine($newKeys, $originalKeys);
+
+        unset($this->calls[$mapping[$index]]);
+    }
+
+    public function removeAllMocks(): void
+    {
+        $this->calls = [];
+        $this->lastCall = null;
+    }
+
+    public function repeat(int $times = 1): void
+    {
+        if ($this->lastCall !== null || empty($this->calls)) {
+            throw new RuntimeException('Can\'t call repeat() after calling a method or if no calling has done.');
+        }
+
+        $call = end($this->calls);
+
+        for ($i = 0; $i < $times; $i++) {
+            $this->calls[] = clone $call;
+        }
+    }
+}
